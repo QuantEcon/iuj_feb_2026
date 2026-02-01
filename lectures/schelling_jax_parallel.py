@@ -10,7 +10,7 @@ num_of_type_1 = 1000
 n = num_of_type_0 + num_of_type_1
 num_neighbors = 10
 require_same_type = 5
-num_candidates = 10  # number of candidate locations to try per unhappy agent
+num_candidates = 3  # number of candidate locations to try per unhappy agent
 
 
 def initialize_state(key):
@@ -21,28 +21,47 @@ def initialize_state(key):
 
 @jit
 def get_distances(loc, locations):
-    diff = loc - locations
-    return jnp.sum(diff**2, axis=1)
+    """
+    Get distances between loc and all other locations.
+
+    """
+    return jnp.sum((loc - locations)**2, axis=1)
 
 
 @jit
 def get_neighbors(loc, agent_idx, locations):
+    """
+    Compute the indices of neighbors to an agent with index agent_idx and
+    location loc.
+
+    """
     distances = get_distances(loc, locations)
+    # Insert infinity at the agent's own location
     distances = distances.at[agent_idx].set(jnp.inf)
+    # Use top_k to get the indices of closest agents
     _, indices = jax.lax.top_k(-distances, num_neighbors)
     return indices
 
 
 @jit
 def is_unhappy(loc, agent_type, agent_idx, locations, types):
+    """
+    Test if an agent with index agent_idx, type agent_type, and location loc
+    is happy or not.
+
+    """
     neighbors = get_neighbors(loc, agent_idx, locations)
     neighbor_types = types[neighbors]
-    num_same = jnp.sum(neighbor_types == agent_type)
-    return num_same < require_same_type
+    num_of_same_type = jnp.sum(neighbor_types == agent_type)
+    return num_of_same_type < require_same_type
 
 
 @jit
 def update_agent(i, locations, types, key):
+    """
+    Update agent i by offering new locations until happy.
+
+    """
     loc = locations[i, :]
     agent_type = types[i]
 
@@ -80,6 +99,10 @@ def plot_distribution(locations, types, title):
 
 @jit
 def get_unhappy_agents(locations, types):
+    """
+    Get the indices and total number of unhappy agents.
+
+    """
     def check_agent(i):
         return is_unhappy(locations[i], types[i], i, locations, types)
 
@@ -94,8 +117,9 @@ def get_unhappy_agents(locations, types):
 @jit
 def find_happy_candidate(i, locations, types, key):
     """
-    Propose num_candidates random locations for agent i.
-    Return the first one where agent is happy, or current location if none work.
+    Propose num_candidates random locations for agent i. Return the first one
+    where agent is happy, or current location if none work.
+
     """
     current_loc = locations[i, :]
     agent_type = types[i]
@@ -165,84 +189,6 @@ def parallel_simulation_loop(locations, types, key, max_iter):
         locations, key = parallel_update_step(locations, types, key)
 
     return locations, iteration, key
-
-
-# --- Semi-parallel algorithm ---
-# Uses the same masking approach as parallel, but identifies unhappy agents first.
-# This is essentially equivalent to the parallel version in terms of work done.
-
-@jit
-def semi_parallel_update_step(locations, types, unhappy_indices, num_unhappy, key):
-    """
-    Semi-parallel: identify unhappy agents first, then try to move only those.
-    Uses masking to skip computation for happy agents.
-    """
-    # Generate keys for all agents
-    keys = random.split(key, n + 1)
-    key = keys[0]
-    agent_keys = keys[1:]
-
-    # Create validity mask
-    valid_mask = jnp.arange(n) < num_unhappy
-
-    # For each position in unhappy_indices, try to find a happy location
-    def try_move_one(j):
-        i = unhappy_indices[j]
-        new_loc = find_happy_candidate(i, locations, types, agent_keys[j])
-        return new_loc
-
-    new_locs = vmap(try_move_one)(jnp.arange(n))
-
-    # Update locations only for valid unhappy agents
-    def apply_update(locs, j):
-        i = unhappy_indices[j]
-        new_loc = jnp.where(valid_mask[j], new_locs[j], locs[i])
-        return locs.at[i, :].set(new_loc), None
-
-    locations, _ = jax.lax.scan(apply_update, locations, jnp.arange(n))
-
-    return locations, key
-
-
-def semi_parallel_simulation_loop(locations, types, key, max_iter):
-    """Semi-parallel: only process unhappy agents each iteration."""
-    iteration = 0
-    while iteration < max_iter:
-        print(f'Entering iteration {iteration + 1}')
-        iteration += 1
-
-        unhappy_indices, num_unhappy = get_unhappy_agents(locations, types)
-
-        if num_unhappy == 0:
-            break
-
-        locations, key = semi_parallel_update_step(
-            locations, types, unhappy_indices, num_unhappy, key
-        )
-
-    return locations, iteration, key
-
-
-def run_semi_parallel_simulation(max_iter=100_000, seed=42):
-    """Run the semi-parallel Schelling simulation."""
-    key = random.PRNGKey(seed)
-    key, init_key = random.split(key)
-    locations, types = initialize_state(init_key)
-
-    plot_distribution(locations, types, 'Initial distribution')
-
-    start_time = time.time()
-    locations, iteration, key = semi_parallel_simulation_loop(locations, types, key, max_iter)
-    elapsed = time.time() - start_time
-
-    plot_distribution(locations, types, f'Iteration {iteration}')
-
-    if iteration < max_iter:
-        print(f'Converged in {elapsed:.2f} seconds after {iteration} iterations.')
-    else:
-        print('Hit iteration bound and terminated.')
-
-    return locations, types
 
 
 def run_parallel_simulation(max_iter=100_000, seed=42):
@@ -331,14 +277,9 @@ if __name__ == '__main__':
     key, subkey = random.split(key)
     _, _ = parallel_update_step(test_locations, test_types, subkey)
 
-    # Warm up semi-parallel algorithm
-    unhappy_indices, num_unhappy = get_unhappy_agents(test_locations, test_types)
-    key, subkey = random.split(key)
-    _, _ = semi_parallel_update_step(test_locations, test_types, unhappy_indices, num_unhappy, subkey)
-
     print("JAX functions compiled and ready!")
 
-    # Run all simulations for comparison
+    # Run both simulations for comparison
     print("\n" + "="*50)
     print("SEQUENTIAL ALGORITHM")
     print("="*50)
@@ -348,8 +289,3 @@ if __name__ == '__main__':
     print("PARALLEL ALGORITHM")
     print("="*50)
     locations, types = run_parallel_simulation()
-
-    print("\n" + "="*50)
-    print("SEMI-PARALLEL ALGORITHM")
-    print("="*50)
-    locations, types = run_semi_parallel_simulation()
