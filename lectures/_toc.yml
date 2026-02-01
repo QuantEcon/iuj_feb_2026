@@ -8,4 +8,3 @@ parts:
   - file: schelling_numpy
   - file: schelling_numba
   - file: schelling_jax
-  - file: schelling_jax_parallel

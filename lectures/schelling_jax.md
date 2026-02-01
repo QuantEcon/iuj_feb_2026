@@ -40,7 +40,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import jax
 import jax.numpy as jnp
-from jax import random, jit
+from jax import random, jit, vmap
 import time
 ```
 
@@ -118,17 +118,6 @@ def initialize_state(key):
     """
     Initialize agent locations and types.
 
-    Parameters
-    ----------
-    key : JAX PRNGKey
-        Random key for reproducibility.
-
-    Returns
-    -------
-    locations : jnp.ndarray of shape (n, 2)
-        Initial (x, y) coordinates of all agents.
-    types : jnp.ndarray of length n
-        Type (0 or 1) of each agent.
     """
     locations = random.uniform(key, shape=(n, 2))
     types = jnp.array([0] * num_of_type_0 + [1] * num_of_type_1)
@@ -150,13 +139,11 @@ Now let's rewrite our core functions for JAX. We add the `@jit` decorator
 @jit
 def get_distances(loc, locations):
     """
-    Compute the Euclidean distance from one location to all agent locations.
+    Compute squared Euclidean distance from one location to all agent locations.
 
-    Unlike the Numba version, we use vectorized operations here because JAX
-    excels at compiling array operations, especially on GPUs.
     """
     diff = loc - locations  # broadcasting: (2,) - (n, 2) -> (n, 2)
-    return jnp.sqrt(jnp.sum(diff ** 2, axis=1))
+    return jnp.sum(diff**2, axis=1)
 ```
 
 Notice that we use vectorized operations like in NumPy, rather than explicit
@@ -171,17 +158,25 @@ compiler.
 
 ```{code-cell} ipython3
 @jit
-def get_neighbors(i, locations):
+def get_neighbors(loc, agent_idx, locations):
     """
-    Get indices of the k nearest neighbors to agent i (excluding self).
+    Get indices of the k nearest neighbors to a location (excluding agent_idx).
+
+    Parameters
+    ----------
+    loc : array of shape (2,)
+        The location to find neighbors for.
+    agent_idx : int
+        The index of the agent (excluded from neighbors).
+    locations : array of shape (n, 2)
+        All agent locations.
     """
-    loc = locations[i, :]
     distances = get_distances(loc, locations)
-    # Set self-distance to infinity so we don't count ourselves as a neighbor
-    distances = distances.at[i].set(jnp.inf)
-    # jnp.argsort works just like np.argsort
-    indices = jnp.argsort(distances)
-    return indices[:k]
+    # Set self-distance to infinity so agent doesn't count as own neighbor
+    distances = distances.at[agent_idx].set(jnp.inf)
+    # Use top_k on negated distances to find k smallest in O(n) instead of O(n log n)
+    _, indices = jax.lax.top_k(-distances, k)
+    return indices
 ```
 
 Note that we use `distances.at[i].set(jnp.inf)` instead of `distances[i] = jnp.inf`
@@ -192,19 +187,33 @@ index `i` set to infinity.
 
 ```{code-cell} ipython3
 @jit
-def is_happy(i, locations, types):
+def is_happy(loc, agent_type, agent_idx, locations, types):
     """
-    True if agent i has at least require_same_type neighbors of the same type.
+    True if an agent at loc would have enough same-type neighbors.
+
+    Parameters
+    ----------
+    loc : array of shape (2,)
+        The location to test.
+    agent_type : int
+        The type of the agent (0 or 1).
+    agent_idx : int
+        The index of the agent (excluded from neighbor calculation).
+    locations : array of shape (n, 2)
+        All agent locations.
+    types : array of shape (n,)
+        All agent types.
     """
-    agent_type = types[i]
-    neighbors = get_neighbors(i, locations)
+    neighbors = get_neighbors(loc, agent_idx, locations)
     neighbor_types = types[neighbors]
     num_same = jnp.sum(neighbor_types == agent_type)
     return num_same >= require_same_type
 ```
 
-This looks almost identical to the NumPy version. The main difference is using
-`jnp` instead of `np`.
+This function takes the location and type as explicit arguments, rather than
+looking them up from the arrays. This design allows us to test hypothetical
+locations without modifying the `locations` array — useful when an agent is
+searching for a happy location.
 
 ### Counting Happy Agents
 
@@ -214,54 +223,53 @@ def count_happy(locations, types):
     """
     Count the number of happy agents.
 
-    We use jax.lax.fori_loop instead of a Python for loop. This is necessary
-    because JAX's JIT compiler needs to know the loop structure at compile time.
+    We use vmap to vectorize is_happy across all agents, checking them
+    in parallel rather than sequentially.
     """
-    def body_fn(i, count):
-        return count + is_happy(i, locations, types)
+    def check_agent(i):
+        return is_happy(locations[i], types[i], i, locations, types)
 
-    return jax.lax.fori_loop(0, n, body_fn, 0)
+    all_happy = vmap(check_agent)(jnp.arange(n))
+    return jnp.sum(all_happy)
 ```
 
-Here we encounter something new: `jax.lax.fori_loop`. In JAX, regular Python
-`for` loops don't work well inside JIT-compiled functions. Instead, JAX
-provides special loop constructs:
+Here we use `vmap` (vectorized map) to apply `is_happy` to all agents in
+parallel. Instead of looping through agents one by one, `vmap` transforms
+`is_happy` into a function that operates on batches of inputs simultaneously.
 
-- `jax.lax.fori_loop(start, stop, body_fn, init_val)` — like `for i in
-  range(start, stop)`
-- `jax.lax.while_loop(cond_fn, body_fn, init_val)` — like `while condition:`
-
-These constructs can be compiled and optimized by JAX.
+The pattern `vmap(lambda i: f(i, ...))(indices)` is common in JAX — it says
+"apply this function to each index in parallel."
 
 ### Moving Unhappy Agents
 
-This function is more complex because it needs to:
-1. Use a while loop (agent keeps moving until happy)
-2. Handle random number generation
-3. Update the locations array (which is immutable in JAX)
+This function finds a location where the agent would be happy. Rather than
+updating the `locations` array on each iteration, it tests candidate locations
+directly and returns only the final location.
 
 ```{code-cell} ipython3
 @jit
 def update_agent(i, locations, types, key):
     """
-    Move agent i to a new location where they are happy.
+    Find a location where agent i is happy.
 
-    Returns the updated locations array and a new random key.
+    Returns the new location and updated random key. The calling code
+    is responsible for updating the locations array if the agent moved.
     """
+    loc = locations[i, :]
+    agent_type = types[i]
+
     def cond_fn(state):
-        locations, key = state
-        return ~is_happy(i, locations, types)  # ~ is logical NOT
+        loc, key = state
+        return ~is_happy(loc, agent_type, i, locations, types)
 
     def body_fn(state):
-        locations, key = state
+        _, key = state
         key, subkey = random.split(key)
         new_loc = random.uniform(subkey, shape=(2,))
-        # Create new array with updated location (JAX arrays are immutable)
-        locations = locations.at[i, :].set(new_loc)
-        return locations, key
+        return new_loc, key
 
-    locations, key = jax.lax.while_loop(cond_fn, body_fn, (locations, key))
-    return locations, key
+    final_loc, key = jax.lax.while_loop(cond_fn, body_fn, (loc, key))
+    return final_loc, key
 ```
 
 Let's break down the key JAX concepts here:
@@ -269,15 +277,15 @@ Let's break down the key JAX concepts here:
 1. **`jax.lax.while_loop`**: Takes three arguments:
    - `cond_fn(state)` — returns True to continue looping, False to stop
    - `body_fn(state)` — executes one iteration, returns new state
-   - `(locations, key)` — initial state (a tuple)
+   - `(loc, key)` — initial state (a tuple containing location and random key)
 
 2. **`random.split(key)`**: Since JAX random numbers are deterministic, we
    need to "split" the key to get new randomness. Each split produces two new
    keys: one to use now, one to save for later.
 
-3. **`locations.at[i, :].set(new_loc)`**: This is JAX's way of "updating" an
-   immutable array. It returns a *new* array with the value at position
-   `[i, :]` changed to `new_loc`. The original array is unchanged.
+3. **Testing without updating**: By passing `loc` directly to `is_happy`, we
+   can test candidate locations without modifying the `locations` array. This
+   avoids creating new arrays inside the loop, improving efficiency.
 
 ## Visualization
 
@@ -331,9 +339,10 @@ def run_simulation(max_iter=100_000, seed=1234):
         someone_moved = False
         for i in range(n):
             old_loc = locations[i, :]
-            locations, key = update_agent(i, locations, types, key)
-            if not jnp.array_equal(old_loc, locations[i, :]):
+            new_loc, key = update_agent(i, locations, types, key)
+            if not jnp.array_equal(old_loc, new_loc):
                 someone_moved = True
+                locations = locations.at[i, :].set(new_loc)
     elapsed = time.time() - start_time
 
     plot_distribution(locations, types, f'Iteration {iteration}')
@@ -346,11 +355,12 @@ def run_simulation(max_iter=100_000, seed=1234):
     return locations, types
 ```
 
-The main simulation loop is similar to the NumPy version, but with two key
-differences:
+The main simulation loop is similar to the NumPy version, but with key
+differences for JAX:
 
 1. We pass and receive the random `key` in each call to `update_agent`
-2. The `locations` array is replaced (not modified) in each iteration
+2. `update_agent` returns the new location, not the whole array
+3. We only update `locations` when an agent actually moves
 
 ## Warming Up JAX
 
@@ -365,8 +375,8 @@ test_types = jnp.array([0] * 50 + [1] * 50)
 
 # Call each function once to compile it
 _ = get_distances(test_locations[0], test_locations)
-_ = get_neighbors(0, test_locations)
-_ = is_happy(0, test_locations, test_types)
+_ = get_neighbors(test_locations[0], 0, test_locations)
+_ = is_happy(test_locations[0], test_types[0], 0, test_locations, test_types)
 _ = count_happy(test_locations, test_types)
 key, subkey = random.split(key)
 _, _ = update_agent(0, test_locations, test_types, subkey)
@@ -395,7 +405,8 @@ locations, types = initialize_state(init_key)
 
 # Time one iteration (one pass through all agents)
 for i in range(n):
-    locations, key = update_agent(i, locations, types, key)
+    new_loc, key = update_agent(i, locations, types, key)
+    locations = locations.at[i, :].set(new_loc)
 ```
 
 On a CPU, JAX's performance is often similar to Numba. The real advantage of
@@ -451,8 +462,6 @@ algorithm has inherent sequential dependencies:
 These characteristics don't map well to parallel hardware like GPUs, which
 excel at performing the same operation on many data points simultaneously.
 
-In the {doc}`next lecture <schelling_jax_parallel>`, we redesign the algorithm
-to be fully parallelizable, demonstrating how to get the most out of JAX.
 
 ## Summary
 
