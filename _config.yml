@@ -1,0 +1,60 @@
+title: Schelling Model Workshop
+author: QuantEcon
+logo: _static/qe-logo.png
+description: A workshop studying the Schelling segregation model with accelerated implementations using Numba and JAX.
+
+parse:
+  myst_enable_extensions:
+    - amsmath
+    - colon_fence
+    - deflist
+    - dollarmath
+    - html_admonition
+    - html_image
+    - linkify
+    - replacements
+    - smartquotes
+    - substitution
+    - tasklist
+
+only_build_toc_files: true
+execute:
+  execute_notebooks: "cache"
+  timeout: 600
+
+bibtex_bibfiles:
+  - _static/quant-econ.bib
+
+latex:
+  latex_documents:
+    targetname: schelling-workshop.tex
+
+sphinx:
+  extra_extensions: [sphinx_multitoc_numbering, sphinx_exercise, sphinx_togglebutton, sphinx_proof]
+  config:
+    bibtex_reference_style: author_year
+    nb_render_image_options:
+      width: 80%
+    nb_code_prompt_show: "Show {type}"
+    nb_merge_streams: true
+    suppress_warnings: [mystnb.unknown_mime_type, myst.domains]
+    html_js_files:
+      - https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js
+    html_favicon: _static/lectures-favicon.ico
+    html_theme: quantecon_book_theme
+    html_static_path: ['_static']
+    html_theme_options:
+      authors:
+        - name: QuantEcon
+          url: https://quantecon.org/
+      dark_logo: quantecon-logo-transparent.png
+      header_organisation_url: https://quantecon.org
+      header_organisation: QuantEcon
+      repository_url: https://github.com/QuantEcon/schelling-workshop
+      description: A workshop studying the Schelling segregation model with accelerated implementations.
+    mathjax3_config:
+      tex:
+        macros:
+          "argmax": "arg\\,max"
+          "argmin": "arg\\,min"
+    mathjax_path: https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
