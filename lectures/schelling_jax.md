@@ -221,7 +221,7 @@ directly and returns only the final location.
 
 ```{code-cell} ipython3
 @jit
-def update_agent(i, locations, types, key):
+def update_agent(i, locations, types, key, max_attempts=10_000):
     """
     Find a location where agent i is happy.
 
@@ -232,16 +232,16 @@ def update_agent(i, locations, types, key):
     agent_type = types[i]
 
     def cond_fn(state):
-        loc, key = state
-        return is_unhappy(loc, agent_type, i, locations, types)
+        loc, key, attempts = state
+        return (attempts < max_attempts) & is_unhappy(loc, agent_type, i, locations, types)
 
     def body_fn(state):
-        _, key = state
+        _, key, attempts = state
         key, subkey = random.split(key)
         new_loc = random.uniform(subkey, shape=(2,))
-        return new_loc, key
+        return new_loc, key, attempts + 1
 
-    final_loc, key = jax.lax.while_loop(cond_fn, body_fn, (loc, key))
+    final_loc, key, _ = jax.lax.while_loop(cond_fn, body_fn, (loc, key, 0))
     return final_loc, key
 ```
 
