@@ -368,18 +368,21 @@ def update_agent_location(i, locations, types, key, params):
         return ~jax_is_unhappy(loc, agent_type, i, locations, types, params)
     happy_at_candidates = vmap(check_candidate)(candidates)
 
-    # Find first happy candidate
+    # Find first happy candidate (if any)
     first_happy_idx = jnp.argmax(happy_at_candidates)
     any_happy = jnp.any(happy_at_candidates)
-    best_move_loc = candidates[first_happy_idx]
 
     # Check if agent is already happy at current location
     is_happy = ~jax_is_unhappy(current_loc, agent_type, i, locations, types, params)
 
     # Move only if unhappy and found a happy candidate; otherwise stay put
     new_loc = jnp.where(is_happy,
-                current_loc,
-                jnp.where(any_happy, best_move_loc, current_loc)
+                current_loc,                      # Happy agents branch
+                jnp.where(                        # Unhappy agents branch
+                    any_happy,                    # If there is a good candidate 
+                    candidates[first_happy_idx],  # Move to it
+                    current_loc                   # Otherwise stay still
+                )
               )
     return new_loc
 
