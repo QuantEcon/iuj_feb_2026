@@ -7,7 +7,7 @@ on:
 
 # Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -54,10 +54,39 @@ jobs:
         shell: bash -l {0}
         run: pip list
       
+      # Build Download Notebooks first (so HTML theme detects them)
+      - name: Build Download Notebooks (sphinx-tojupyter)
+        shell: bash -l {0}
+        run: |
+          jb build lectures --path-output ./ --builder=custom --custom-builder=jupyter -n -W --keep-going
+      
+      - name: Copy notebooks for download and Colab support
+        shell: bash -l {0}
+        run: |
+          # Copy to _build/html/_notebooks for download button
+          mkdir -p _build/html/_notebooks
+          cp _build/jupyter/*.ipynb _build/html/_notebooks/ 2>/dev/null || true
+          echo "Notebooks copied to _build/html/_notebooks/ for download:"
+          ls -la _build/html/_notebooks/
+          # Copy to notebooks/ folder in repo for Colab
+          mkdir -p notebooks
+          cp _build/jupyter/*.ipynb notebooks/ 2>/dev/null || true
+          echo "Notebooks copied to notebooks/ folder for Colab:"
+          ls -la notebooks/
+      
+      # Build HTML (after notebooks so theme can detect them)
       - name: Build HTML
         shell: bash -l {0}
         run: |
           jb build lectures --path-output ./ -n -W --keep-going
+      
+      - name: Commit notebooks to repo
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add notebooks/
+          git diff --staged --quiet || git commit -m "Update notebooks for Colab [skip ci]"
+          git push
       
       - name: Upload Execution Reports
         uses: actions/upload-artifact@v4
