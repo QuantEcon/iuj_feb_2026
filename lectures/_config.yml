@@ -63,6 +63,7 @@ sphinx:
       og_logo_url: https://assets.quantecon.org/img/qe-og-logo.png
       description: A workshop studying the Schelling segregation model with accelerated implementations using Numba and JAX.
       keywords: Python, QuantEcon, Schelling Model, Segregation, JAX, Numba, GPU
+      download_nb_path: https://quantecon.github.io/iuj_feb_2026
       launch_buttons:
         colab_url: https://colab.research.google.com
     mathjax3_config:
