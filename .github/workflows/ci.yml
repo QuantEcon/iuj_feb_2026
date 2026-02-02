@@ -54,6 +54,11 @@ jobs:
           name: execution-reports-html
           path: _build/html/reports
 
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Preview Deploy to Netlify
         uses: QuantEcon/actions/preview-netlify@main
         with:
