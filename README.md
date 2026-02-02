@@ -1,34 +1,29 @@
-# Schelling Model Workshop
+# Computational Methods for Simulation
+
+## An Analysis of the Schelling Model
 
 [![Build & Publish](https://github.com/QuantEcon/iuj_feb_2026/actions/workflows/publish.yml/badge.svg)](https://github.com/QuantEcon/iuj_feb_2026/actions/workflows/publish.yml)
 
-A workshop studying the Schelling segregation model with accelerated implementations using Numba and JAX.
+**Prepared for the International University of Japan**
+
+**Author: [John Stachurski](https://johnstachurski.net/)**
+
+This workshop explores simulation for economic analysis.
+
+It demonstrates how to accelerate simulations using modern Python tools.
+
+This workshop focuses on Thomas Schelling's segregation model as our running example.
+
+The key ideas can be applied in other settings.
 
 ## Overview
 
-This repository contains lecture materials for a workshop on the Schelling segregation model, demonstrating various computational approaches:
+The Schelling segregation model shows how mild individual preferences can lead to extreme aggregate outcomes. We study:
 
-1. **Segregation Background** - Introduction to the segregation problem
-2. **Schelling Model** - The classic Schelling model implementation
-3. **NumPy Implementation** - Vectorized implementation using NumPy
-4. **JAX Implementation** - GPU-accelerated implementation using JAX
-5. **JAX Parallel** - Parallel computing with JAX
-
-## Building the Book
-
-To build the Jupyter Book locally:
-
-```bash
-# Create and activate the conda environment
-conda env create -f environment.yml
-conda activate quantecon
-
-# Build the book
-cd lectures
-jupyter-book build .
-```
-
-The HTML output will be in `lectures/_build/html/`.
+1. **The basic model** — Understanding the dynamics of racial segregation using Python classes
+2. **NumPy implementation** — Rewriting the model with arrays and functions for clarity and speed
+3. **JAX implementation** — Translating the model to JAX syntax and concepts
+4. **Further parallelization** — How can we exploit modern parallel hardware (e.g., GPUs)
 
 ## Requirements
 
@@ -37,10 +32,6 @@ The HTML output will be in `lectures/_build/html/`.
 - GPU support (optional, for JAX acceleration)
 
 See [environment.yml](environment.yml) for the full list of dependencies.
-
-## Source
-
-These lectures are developed by [QuantEcon](https://quantecon.org/).
 
 ## License
 
