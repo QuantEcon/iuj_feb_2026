@@ -85,9 +85,10 @@ $0 < x, y < 1$.
 
 ### Preferences
 
-We will say that an agent is *happy* if no more than 6 of her 10 nearest neighbors are of a different type.
+We will say that an agent is **happy** if up to 6 of her 10 nearest neighbors are of a different type.
 
-An agent who is not happy is called *unhappy*.
+She is **unhappy** if 7 or more of her 10 nearest neighbors are of a different
+type.
 
 For example,
 
@@ -98,7 +99,7 @@ For example,
 
 An important point to note is that agents are **not** averse to living in mixed areas.
 
-They are perfectly happy if half of their neighbors are of the other color.
+They are perfectly happy if 60% of their neighbors are of the other color.
 
 Let's set up the parameters for our simulation:
 
@@ -118,8 +119,8 @@ Initially, agents are mixed together (integrated).
 In particular, we assume that the initial location of each agent is an
 independent draw from a bivariate uniform distribution on the unit square $S$.
 
-* First their $x$ coordinate is drawn from a uniform distribution on $(0,1)$
-* Then, independently, their $y$ coordinate is drawn from the same distribution.
+* Their $x$ coordinate is drawn from a uniform distribution on $(0,1)$
+* Their $y$ coordinate is drawn independently from the same distribution.
 
 Now, cycling through the set of all agents, each agent is now given the chance to stay or move.
 
@@ -191,11 +192,11 @@ def happy(agent, all_agents):
     # distance from agent to all other agents.
     distances = []
 
-    # Create the list
-    for other_agent in all_agents:
-        if other_agent != agent:
-            distance = get_distance(other_agent, agent)
-            distances.append((distance, other_agent))
+    # Populate the list
+    for some_agent in all_agents:
+        if some_agent != agent:
+            distance = get_distance(some_agent, agent)
+            distances.append((distance, some_agent))
 
     # Sort from smallest to largest, according to distance
     distances.sort()
@@ -206,6 +207,7 @@ def happy(agent, all_agents):
 
     # Count how many neighbors have a different type
     num_other_type = sum(agent.type != neighbor.type for neighbor in neighbors)
+    # Return true if does not exceed theshold
     return num_other_type <= max_other_type
 
 
@@ -299,6 +301,7 @@ def run_simulation(num_of_type_0=num_of_type_0,
         # Offer each agent the chance to relocate
         for agent in all_agents:
             old_location = agent.location
+            # Relocate unhappy agents (happy ones won't move)
             relocate(agent, all_agents)
             if agent.location != old_location:
                 number_of_moves += 1

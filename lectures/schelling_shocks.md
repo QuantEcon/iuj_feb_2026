@@ -23,16 +23,23 @@ But real cities don't work this way. People move in and out, neighborhoods
 change, and the population is constantly being reshuffled by small shocks.
 
 In this lecture, we explore what happens when we add this kind of persistent
-randomness to the model. Specifically, after each iteration, we randomly flip
-the type of some agents with a small probability. We can interpret this as
+randomness to the model.
+
+Specifically, after each iteration, we randomly flip
+the type of some agents with a small probability. 
+
+We can interpret this as
 agents occasionally moving away and being replaced by new agents whose type is
 randomly determined.
 
-The key finding is striking: **with persistent shocks, the system never
-converges, so the segregation dynamics keep operating indefinitely**. Because
-agents are constantly being nudged out of equilibrium, the forces that drive
-segregation never shut off. The result is that segregation levels continue to
-increase over time, reaching levels far beyond what we see in the basic model.
+With persistent shocks, the system never
+converges, so the segregation dynamics keep operating indefinitely. 
+
+Because agents are constantly being nudged out of equilibrium, the forces that drive
+segregation never shut off. 
+
+The result is that segregation levels **continue to
+increase over time**, reaching levels **beyond what we see in the basic model**.
 
 We use the parallel JAX implementation for efficiency, allowing us to run
 longer simulations with more agents.
