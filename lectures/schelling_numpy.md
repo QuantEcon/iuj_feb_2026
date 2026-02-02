@@ -31,7 +31,7 @@ Let's start with some imports:
 ```{code-cell} ipython3
 import matplotlib.pyplot as plt
 import numpy as np
-from numpy.random import uniform, randint
+from numpy.random import uniform
 import time
 ```
 
@@ -237,10 +237,14 @@ When an agent is unhappy, they keep trying new random locations until they find
 one where they're happy:
 
 ```{code-cell} ipython3
-def update_agent(i, locations, types):
+def update_agent(i, locations, types, max_attempts=10_000):
     " Move agent i to a new location where they are happy. "
+    attempts = 0
     while not is_happy(i, locations, types):
         locations[i, :] = uniform(), uniform()
+        attempts += 1
+        if attempts >= max_attempts:
+            break
 ```
 
 Here's how this works:
@@ -328,9 +332,8 @@ def run_simulation(max_iter=100_000, seed=42):
         iteration += 1
         someone_moved = False
         for i in range(n):
-            old_location = locations[i, :].copy()
-            update_agent(i, locations, types)
-            if not np.array_equal(old_location, locations[i, :]):
+            if not is_happy(i, locations, types):
+                update_agent(i, locations, types)
                 someone_moved = True
     elapsed = time.time() - start_time
 
