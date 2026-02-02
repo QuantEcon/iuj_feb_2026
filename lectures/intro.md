@@ -1,6 +1,18 @@
-# Schelling Model Workshop
+# Computational Methods for Simulation
 
-This workshop explores Thomas Schelling's segregation model and demonstrates how to accelerate the simulation using modern Python tools.
+## An Analysis of the Schelling Model
+
+**Prepared for the International University of Japan**
+
+**Author: [John Stachurski](https://johnstachurski.net/)**
+
+This workshop explores simulation for economic analysis.
+
+It demonstrates how to accelerate simulations using modern Python tools.
+
+This workshop focuses on Thomas Schelling's segregation model as our running example.
+
+The key ideas can be applied in other settings.
 
 ## Overview
 
@@ -9,12 +21,8 @@ The Schelling segregation model shows how mild individual preferences can lead t
 1. **The basic model** — Understanding the dynamics of racial segregation using Python classes
 2. **NumPy implementation** — Rewriting the model with arrays and functions for clarity and speed
 3. **JAX implementation** — Translating the model to JAX syntax and concepts
+3. **Further parallelization** — How can we exploit modern parallel hardware (e.g., GPUs)
 
-## Prerequisites
-
-- Basic Python programming
-- Familiarity with NumPy
-- Understanding of agent-based models (helpful but not required)
 
 ```{tableofcontents}
 ```

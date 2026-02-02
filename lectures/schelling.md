@@ -56,7 +56,6 @@ Let's start with some imports:
 import matplotlib.pyplot as plt
 from random import uniform, seed
 from math import sqrt
-import numpy as np
 import time
 ```
 
@@ -86,13 +85,13 @@ $0 < x, y < 1$.
 
 ### Preferences
 
-We will say that an agent is *happy* if 5 or more of her 10 nearest neighbors are of the same type.
+We will say that an agent is *happy* if 4 or more of her 10 nearest neighbors are of the same type.
 
 An agent who is not happy is called *unhappy*.
 
 For example,
 
-*  if an agent is orange and 5 of her 10 nearest neighbors are green, then she is happy.
+*  if an agent is orange and 6 of her 10 nearest neighbors are green, then she is happy.
 *  if an agent is green and 8 of her 10 nearest neighbors are orange, then she is unhappy.
 
 'Nearest' is in terms of [Euclidean distance](https://en.wikipedia.org/wiki/Euclidean_distance).
@@ -107,7 +106,7 @@ Let's set up the parameters for our simulation:
 num_of_type_0 = 1000    # number of agents of type 0 (orange)
 num_of_type_1 = 1000    # number of agents of type 1 (green)
 num_neighbors = 10      # number of agents viewed as neighbors
-require_same_type = 5   # number of neighbors that must be same type for happiness
+require_same_type = 4   # number of neighbors that must be same type for happiness
 ```
 
 +++
@@ -340,23 +339,15 @@ This is despite the fact that people in the model don't actually mind living mix
 
 Even with these preferences, the outcome is a high degree of segregation.
 
+
 ## Performance
 
-Let's measure how long it takes to run one iteration (one pass through all agents):
+Our Python code was written for readability, not speed.
 
-```{code-cell} ipython3
-%%time
-# Set up agents
-seed(1234)
-agents = [Agent(0) for i in range(num_of_type_0)]
-agents.extend(Agent(1) for i in range(num_of_type_1))
+This is fine for very small simulations but not for big ones.
 
-# Time one iteration (one pass through all agents)
-for agent in agents:
-    relocate(agent, agents)
-```
+In the following lectures we'll look at strategies for making our code faster.
 
-This gives us a baseline to compare against when we optimize the code in later lectures.
 
 ## References
 

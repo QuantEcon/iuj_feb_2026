@@ -16,17 +16,15 @@ kernelspec:
 ## Overview
 
 In the {doc}`previous lecture <schelling>`, we implemented the Schelling
-segregation model using Python classes.
+segregation model using pure Python and standard libraries, rather than
+Python plus numerical and scientific libraries.
 
 In this lecture, we rewrite the model using NumPy arrays and functions.
 
-This approach has several advantages:
+NumPy is the most fundamental library for numerical coding in Python.
 
-1. **Simpler code** — no need to understand object-oriented programming
-2. **Faster execution** — NumPy operations are optimized for numerical computation
-3. **Easier to accelerate** — this style of code can be readily sped up with JAX
+We'll achieve greater speed --- but at the cost of readability!
 
-Let's start with some imports:
 
 ```{code-cell} ipython3
 import matplotlib.pyplot as plt
@@ -34,6 +32,7 @@ import numpy as np
 from numpy.random import uniform
 import time
 ```
+
 
 ## Data Representation
 
@@ -44,16 +43,14 @@ Here we take a different approach: we store all agent data in NumPy arrays.
 * `locations` — an $n \times 2$ array where row $i$ holds the $(x, y)$ coordinates of agent $i$
 * `types` — an array of length $n$ where entry $i$ is 0 or 1, indicating agent $i$'s type
 
-This is sometimes called "struct of arrays" (SoA) style, as opposed to "array of structs" (AoS).
-
 Let's set up the parameters:
 
 ```{code-cell} ipython3
 num_of_type_0 = 1000    # number of agents of type 0 (orange)
 num_of_type_1 = 1000    # number of agents of type 1 (green)
 n = num_of_type_0 + num_of_type_1  # total number of agents
-k = 10                  # number of agents regarded as neighbors
-require_same_type = 5   # want >= require_same_type neighbors of the same type
+num_neighbors = 10      # number of agents viewed as neighbors
+require_same_type = 4   # want >= require_same_type neighbors of the same type
 ```
 
 Here's a function to initialize the state with random locations and types:
@@ -77,10 +74,11 @@ print(f"\ntypes shape: {types.shape}")
 print(f"First 20 types: {types[:20]}")
 ```
 
+
 ## Helper Functions
 
-Instead of methods on a class, we write standalone functions that operate on
-the arrays.
+Let's write some functions that compute what we need while operating on the arrays.
+
 
 ### Computing Distances
 
@@ -91,17 +89,6 @@ def get_distances(loc, locations):
     """
     Compute the Euclidean distance from one location to all agent locations.
 
-    Parameters
-    ----------
-    loc : array of length 2
-        The (x, y) coordinates of the reference point.
-    locations : array of shape (n, 2)
-        The (x, y) coordinates of all agents.
-
-    Returns
-    -------
-    array of length n
-        The distance from loc to each agent.
     """
     return np.linalg.norm(loc - locations, axis=1)
 ```
@@ -113,34 +100,25 @@ Let's break down how this function works:
    and `locations` has 2000 rows, the result is a 2000 × 2 array where each
    row is the difference vector from `loc` to that agent.
 
-2. `np.linalg.norm(..., axis=1)` computes the length (Euclidean norm) of each
+2. `np.linalg.norm(..., axis=1)` computes the Euclidean norm of each
    row. The `axis=1` argument tells NumPy to compute the norm across columns
-   (i.e., for each row separately), giving us 2000 distances.
+   (i.e., for each row separately).
 
 This vectorized approach is much faster than looping through agents one by one.
 
-Let's test it:
-
-```{code-cell} ipython3
-# Distance from agent 0 to all agents
-distances = get_distances(locations[0], locations)
-print(f"Distances from agent 0: {distances[:10].round(3)}...")
-print(f"Distance to self: {distances[0]}")  # Should be 0
-```
 
 ### Finding Neighbors
 
-Now we can find the $k$ nearest neighbors:
+Now we can find the nearest neighbors:
 
 ```{code-cell} ipython3
 def get_neighbors(i, locations):
-    " Get indices of the k nearest neighbors to agent i (excluding self). "
+    " Get indices of the nearest neighbors to agent i (excluding self). "
     loc = locations[i, :]
     distances = get_distances(loc, locations)
-    # Set self-distance to infinity so we don't count ourselves as a neighbor
-    distances[i] = np.inf
-    indices = np.argsort(distances)   # sort agents by distance
-    neighbors = indices[:k]            # keep the k closest
+    distances[i] = np.inf                 # Don't count ourselves 
+    indices = np.argsort(distances)       # Sort agents by distance
+    neighbors = indices[:num_neighbors]   # Keep the closest
     return neighbors
 ```
 
@@ -150,17 +128,15 @@ Here's how this function works:
    each agent).
 
 2. We set `distances[i] = np.inf` so that agent $i$ doesn't count as their own
-   neighbor. This matches the class-based implementation from the previous
-   lecture, where an agent's neighbors are other agents, not themselves.
+   neighbor. 
 
-3. `np.argsort(distances)` returns the *indices* that would sort the distances
-   from smallest to largest. For example, if the smallest distance is at
-   position 42, then `indices[0]` equals 42. This is different from
-   `np.sort()`, which returns the sorted values themselves.
+3. `np.argsort(distances)` returns the *indices* of agents sorted from closest
+   to furthest. For example, if the closest agent has index 
+   42, then `indices[0]` equals 42. 
 
-4. `indices[:k]` uses slicing to keep only the first $k$ indices — these
-   correspond to the $k$ agents with the smallest distances (the nearest
-   neighbors).
+4. `indices[:num_neighbors]` uses slicing to keep only the first `num_neighbors`
+   indices — these correspond to the nearest neighbors.
+
 
 ```{code-cell} ipython3
 # Find neighbors of agent 0
@@ -168,6 +144,7 @@ neighbors = get_neighbors(0, locations)
 print(f"Agent 0's nearest neighbors: {neighbors}")
 print(f"Agent 0 is NOT included: {0 not in neighbors}")
 ```
+
 
 ### Checking Happiness
 
@@ -187,8 +164,8 @@ Let's walk through this function step by step:
 
 1. `types[i]` gets the type (0 or 1) of agent $i$.
 
-2. `get_neighbors(i, locations)` returns an array of indices for the $k$
-   nearest neighbors (excluding agent $i$ themselves).
+2. `get_neighbors(i, locations)` returns an array of indices for the nearest
+   neighbors.
 
 3. `types[neighbors]` uses these indices to look up the types of the
    neighbors. This is called "fancy indexing" — when you pass an array of
@@ -214,6 +191,8 @@ print(f"Agent 0 happy: {is_happy(0, locations, types)}")
 
 ### Counting Happy Agents
 
+The next function uses a loop to check each agent and count how many are happy. 
+
 ```{code-cell} ipython3
 def count_happy(locations, types):
     " Count the number of happy agents. "
@@ -223,8 +202,7 @@ def count_happy(locations, types):
     return happy_count
 ```
 
-This function uses a simple loop to check each agent and count how many are
-happy. Since `is_happy` returns `True` or `False`, and Python treats `True`
+Since `is_happy` returns `True` or `False`, and Python treats `True`
 as 1 when adding, we can accumulate the count directly.
 
 ```{code-cell} ipython3
@@ -263,11 +241,17 @@ Here's how this works:
 
 ## Visualization
 
+Here's some code for Visualization --- we'll skip the details
+
 ```{code-cell} ipython3
 def plot_distribution(locations, types, title):
     " Plot the distribution of agents. "
     fig, ax = plt.subplots()
-    plot_args = {'markersize': 6, 'alpha': 0.8, 'markeredgecolor': 'black', 'markeredgewidth': 0.5}
+    plot_args = {
+        'markersize': 6, 'alpha': 0.8, 
+        'markeredgecolor': 'black', 
+        'markeredgewidth': 0.5
+    }
     colors = 'darkorange', 'green'
     for agent_type, color in zip((0, 1), colors):
         idx = (types == agent_type)
@@ -280,22 +264,6 @@ def plot_distribution(locations, types, title):
     plt.show()
 ```
 
-The key NumPy technique here is **boolean indexing**:
-
-1. `types == agent_type` creates a boolean array of length 2000, with `True`
-   for agents of the current type and `False` otherwise. For example, when
-   `agent_type = 0`, this might produce `[True, False, True, True, False, ...]`.
-
-2. `locations[idx, 0]` uses this boolean array to select rows. Only the rows
-   where `idx` is `True` are kept. The `, 0` selects the first column (x
-   coordinates). Similarly, `locations[idx, 1]` gets the y coordinates.
-
-3. This means we can plot all agents of one type in a single call to
-   `ax.plot()`, without needing to loop through agents individually.
-
-4. The `zip((0, 1), colors)` pairs each type (0 or 1) with its color
-   (orange or green), so the loop runs twice — once for each type.
-
 Let's visualize the initial random distribution:
 
 ```{code-cell} ipython3
@@ -303,6 +271,8 @@ np.random.seed(1234)
 locations, types = initialize_state()
 plot_distribution(locations, types, 'Initial random distribution')
 ```
+
+
 
 ## The Simulation
 
@@ -383,7 +353,7 @@ to the segregation patterns?
 ```
 
 ```{code-cell} ipython3
-def run_simulation_with_flip(max_iter=20, flip_prob=0.01, seed=1234):
+def run_simulation_with_flip(max_iter=200, flip_prob=0.01, seed=1234):
     """
     Run the Schelling simulation with type flipping.
 
@@ -408,7 +378,7 @@ def run_simulation_with_flip(max_iter=20, flip_prob=0.01, seed=1234):
 ```
 
 ```{code-cell} ipython3
-locations, types = run_simulation_with_flip(max_iter=20, flip_prob=0.01)
+locations, types = run_simulation_with_flip()
 ```
 
 With type flipping, the system no longer fully converges because the random

@@ -103,7 +103,7 @@ num_of_type_0 = 1000    # number of agents of type 0 (orange)
 num_of_type_1 = 1000    # number of agents of type 1 (green)
 n = num_of_type_0 + num_of_type_1  # total number of agents
 k = 10                  # number of agents regarded as neighbors
-require_same_type = 5   # want >= require_same_type neighbors of the same type
+require_same_type = 4   # want >= require_same_type neighbors of the same type
 ```
 
 ## Initialization

@@ -4,6 +4,7 @@ parts:
 - caption: Schelling Model
   numbered: true
   chapters:
+  - file: segregation_background
   - file: schelling
   - file: schelling_numpy
   - file: schelling_jax
