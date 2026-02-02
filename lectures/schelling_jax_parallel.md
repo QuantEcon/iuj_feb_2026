@@ -41,8 +41,8 @@ import time
 We use the same parameters across all implementations:
 
 ```{code-cell} ipython3
-num_of_type_0 = 1000
-num_of_type_1 = 1000
+num_of_type_0 = 1500
+num_of_type_1 = 1500
 n = num_of_type_0 + num_of_type_1
 k = 10                  # number of neighbors
 require_same_type = 5   # threshold for happiness
